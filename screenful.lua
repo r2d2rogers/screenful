@@ -6,6 +6,7 @@
 -- Package envronment
 local naughty = require('naughty')
 
+local waitForEdid = 30
 local card = 'card0'
 local dev = '/sys/class/drm/'
 local configPath = '.config/awesome/screens_db.lua'
@@ -16,7 +17,8 @@ local outputMapping = {
 	['VGA-1'] = 'VGA1',
 	['LVDS-1'] = 'LVDS1',
 	['HDMI-A-1'] = 'HDMI1',
-	['HDMI-A-2'] = 'HDMI2'
+	['HDMI-A-2'] = 'HDMI2',
+	['eDP1'] = 'LVDS1'
 }
 
 local function log(text)
@@ -53,15 +55,29 @@ local function connectedOutputs(path, card)
 	return result
 end
 
+local function emptyStr(str)
+	return str == nil or str == ''
+end
+
 local function getScreenId(output)
 	local screenId = ''
 	local edid = io.open(output .. '/edid', 'rb')
 	local id = edid:read('*all')
+	io.close(edid)
+	local start = os.time()
+	while emptyStr(id) and os.time() - start < waitForEdid do
+		edid = io.open(output .. '/edid', 'rb')
+		id = edid:read('*all')
+		io.close(edid)
+	end
 	for i = 12, 17 do
 		code = id:byte(i)
 		if code then
 			screenId = screenId .. code
 		end
+	end
+	if emptyStr(id) then
+		log('cannot read EDID after "' .. waitForEdid .. 's')
 	end
 
 	return screenId
